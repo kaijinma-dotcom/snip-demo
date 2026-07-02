@@ -54,8 +54,12 @@ The superproject stores a pinned commit SHA for each submodule and a
 A plain `git clone` leaves the submodule folders empty. Always use:
 
 ```sh
-git clone --recurse-submodules https://github.com/kaijinma-dotcom/snip-demo.git
+git clone --branch main --recurse-submodules https://github.com/kaijinma-dotcom/snip-demo.git
 ```
+
+> **Note:** `main` is the superproject branch. The repo's GitHub default branch is
+> `frontend` (it was pushed first), so `--branch main` is required to land on the
+> correct branch.
 
 If you already cloned without `--recurse-submodules`:
 
