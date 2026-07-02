@@ -3,6 +3,8 @@
 
 const http = require('http');
 const crypto = require('crypto');
+const { readFileSync, statSync } = require('fs');
+const { extname, join: joinPath, resolve, sep } = require('path');
 
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || 'localhost';
@@ -10,6 +12,25 @@ const BASE_URL = process.env.BASE_URL || `http://${HOST}:${PORT}`;
 
 // In-memory store — swap for a DB adapter without touching the HTTP layer
 const links = new Map(); // code -> { code, url, shortUrl, hits, createdAt }
+
+// Optional static-file serving — set PUBLIC_DIR to enable
+const PUBLIC_DIR = process.env.PUBLIC_DIR ? resolve(process.env.PUBLIC_DIR) : null;
+const MIME = {
+  '.html':  'text/html; charset=utf-8',
+  '.js':    'text/javascript; charset=utf-8',
+  '.mjs':   'text/javascript; charset=utf-8',
+  '.css':   'text/css; charset=utf-8',
+  '.json':  'application/json',
+  '.ico':   'image/x-icon',
+  '.png':   'image/png',
+  '.jpg':   'image/jpeg',
+  '.jpeg':  'image/jpeg',
+  '.svg':   'image/svg+xml',
+  '.woff2': 'font/woff2',
+  '.woff':  'font/woff',
+  '.ttf':   'font/ttf',
+  '.txt':   'text/plain; charset=utf-8',
+};
 
 // ── Tiny router ─────────────────────────────────────────────────────────────
 
@@ -25,13 +46,14 @@ const server = http.createServer((req, res) => {
   }
 
   const url = new URL(req.url, `http://${req.headers.host}`);
-  const path = url.pathname;
+  const urlPath = url.pathname;
 
-  if (req.method === 'GET'  && path === '/api/links') return getLinks(req, res);
-  if (req.method === 'POST' && path === '/api/links') return postLink(req, res);
-  if (req.method === 'GET'  && /^\/[A-Za-z0-9]+$/.test(path)) {
-    return redirect(req, res, path.slice(1));
+  if (req.method === 'GET'  && urlPath === '/api/links') return getLinks(req, res);
+  if (req.method === 'POST' && urlPath === '/api/links') return postLink(req, res);
+  if (req.method === 'GET'  && /^\/[A-Za-z0-9]+$/.test(urlPath)) {
+    return redirect(req, res, urlPath.slice(1));
   }
+  if (PUBLIC_DIR && req.method === 'GET') return serveStatic(req, res, urlPath);
   sendJson(res, 404, { error: 'Not found' });
 });
 
@@ -100,6 +122,36 @@ function sendJson(res, status, body) {
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   });
   res.end(payload);
+}
+
+// ── Static file serving ──────────────────────────────────────────────────────
+
+function serveStatic(_req, res, urlPath) {
+  const rel  = decodeURIComponent(urlPath).replace(/^\//, '') || 'index.html';
+  const abs  = joinPath(PUBLIC_DIR, rel);
+  const safe = resolve(abs);
+  // Guard against path traversal
+  if (safe !== PUBLIC_DIR && !safe.startsWith(PUBLIC_DIR + sep)) {
+    return sendJson(res, 403, { error: 'Forbidden' });
+  }
+  let filePath = safe;
+  try {
+    if (statSync(filePath).isDirectory()) filePath = joinPath(filePath, 'index.html');
+  } catch { /* not found — fall through to SPA fallback */ }
+  try {
+    const data = readFileSync(filePath);
+    res.writeHead(200, { 'Content-Type': MIME[extname(filePath)] || 'application/octet-stream' });
+    return res.end(data);
+  } catch {
+    // SPA fallback: serve index.html so Angular handles client-side routing
+    try {
+      const data = readFileSync(joinPath(PUBLIC_DIR, 'index.html'));
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(data);
+    } catch {
+      return sendJson(res, 404, { error: 'Not found' });
+    }
+  }
 }
 
 server.listen(PORT, () => {
