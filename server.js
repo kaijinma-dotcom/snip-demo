@@ -60,7 +60,7 @@ function postLink(req, res) {
       return sendJson(res, 400, { error: 'url must be http or https' });
     }
 
-    const code = crypto.randomBytes(4).toString('base36').slice(0, 6);
+    const code = crypto.randomBytes(3).toString('hex'); // 6 lowercase hex chars
     const link = {
       code,
       url: rawUrl,
