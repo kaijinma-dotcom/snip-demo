@@ -1,0 +1,47 @@
+<div class="container">
+  <h1>Snip</h1>
+
+  <form class="shorten-form" (ngSubmit)="submit()">
+    <input
+      type="url"
+      placeholder="https://example.com"
+      [ngModel]="urlInput()"
+      (ngModelChange)="urlInput.set($event)"
+      name="url"
+      autocomplete="off"
+    />
+    <button type="submit" [disabled]="loading()">Shorten</button>
+  </form>
+
+  @if (shortUrl()) {
+    <p class="success">
+      Short link:
+      <a [href]="shortUrl()" target="_blank" rel="noopener">{{ shortUrl() }}</a>
+    </p>
+  }
+
+  @if (errorMsg()) {
+    <p class="error">{{ errorMsg() }}</p>
+  }
+
+  @if (links().length > 0) {
+    <table>
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Original URL</th>
+          <th>Hits</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (link of links(); track link.code) {
+          <tr>
+            <td><a [href]="link.shortUrl" target="_blank" rel="noopener">{{ link.code }}</a></td>
+            <td class="url-cell">{{ link.url }}</td>
+            <td>{{ link.hits }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</div>
